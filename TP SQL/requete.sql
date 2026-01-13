@@ -73,3 +73,10 @@ CREATE TABLE journaux_activite (
     REFERENCES utilisateurs(id)
     ON DELETE SET NULL
 );
+
+-- Création d'utilisateurs
+INSERT INTO utilisateurs (nom, email, mot_de_passe)
+VALUES
+  ('Alice',  'alice@example.com',  'motdepasse'),
+  ('Bob',    'bob@example.com',    'motdepasse'),
+  ('Charlie','charlie@example.com','motdepasse');
