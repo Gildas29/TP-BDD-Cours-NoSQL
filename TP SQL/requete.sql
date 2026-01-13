@@ -80,3 +80,10 @@ VALUES
   ('Alice',  'alice@example.com',  'motdepasse'),
   ('Bob',    'bob@example.com',    'motdepasse'),
   ('Charlie','charlie@example.com','motdepasse');
+
+-- Création de produits
+INSERT INTO produits (nom, prix, stock, description)
+VALUES
+  ('Clavier mécanique', 89.90, 10, 'Clavier mécanique RGB'),
+  ('Souris sans fil',   29.99, 25, 'Souris ergonomique'),
+  ('Écran 24 pouces',  159.00, 5,  'Écran Full HD 24"');
