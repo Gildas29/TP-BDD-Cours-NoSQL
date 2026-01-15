@@ -10,14 +10,26 @@ from db.mongo import (
 )
 
 
+def _normalize_numeric_fields(chars):
+    """Assure que ki / max_ki sont bien des float pour éviter l'erreur PyArrow."""
+    for c in chars:
+        for field in ("ki", "max_ki"):
+            val = c.get(field, 0)
+            try:
+                c[field] = float(val) if val is not None else 0.0
+            except (ValueError, TypeError):
+                c[field] = 0.0
+    return chars
+
+
 def render_page():
     st.title("🟠 Interface Dragon Ball (MongoDB)")
 
     tab_list, tab_add, tab_edit = st.tabs(
-        ["📋 Liste / suppression", "➕ Ajouter", "✏️ Modifier"]
+        ["📋 Liste / cartes", "➕ Ajouter", "✏️ Modifier"]
     )
 
-    # --- Onglet 1 : Liste + suppression ---
+    # --- Onglet 1 : Liste + cartes graphiques ---
     with tab_list:
         st.subheader("Liste des personnages")
         chars = get_all_characters()
@@ -25,29 +37,39 @@ def render_page():
         if not chars:
             st.info("Aucun personnage trouvé dans la collection.")
         else:
+            # Normaliser les champs numériques pour éviter ArrowTypeError. [web:160]
+            chars = _normalize_numeric_fields(chars)
+
+            # Vue tableau (toujours utile)
             df = pd.DataFrame(chars)
             st.dataframe(df, use_container_width=True)
 
-            st.markdown("### Supprimer un personnage")
-            ids = [c["_id"] + " - " + str(c.get("name", "")) for c in chars]
-            selected = st.selectbox(
-                "Choisis un personnage à supprimer", options=[""] + ids
-            )
+            st.markdown("### Cartes des personnages")
 
-            if selected:
-                selected_id = selected.split(" - ")[0]
-                if st.button("🗑️ Supprimer ce personnage"):
-                    delete_character(selected_id)
-                    st.success(
-                        "Personnage supprimé. Rafraîchis la page (Ctrl+R) pour mettre à jour la liste."
+            # Affichage en cartes graphiques
+            cols = st.columns(3)
+            for idx, c in enumerate(chars):
+                col = cols[idx % 3]
+                with col:
+                    st.markdown(f"#### {c.get('name', 'Sans nom')}")
+                    if c.get("image"):
+                        st.image(c["image"], use_container_width=True)
+                    st.write(f"**Affiliation / Race :** {c.get('race', 'N/A')}")
+                    st.write(f"**Genre :** {c.get('gender', 'N/A')}")
+                    st.write(
+                        f"**Ki :** {c.get('ki', 'N/A')} / {c.get('max_ki', 'N/A')}"
                     )
+                    desc = c.get("description", "")
+                    if desc:
+                        st.caption(desc[:180] + ("..." if len(desc) > 180 else ""))
 
     # --- Onglet 2 : Ajout ---
     with tab_add:
         st.subheader("Ajouter un nouveau personnage")
 
         name = st.text_input("Nom")
-        race = st.text_input("Race")
+        race = st.text_input("Affiliation / Race")
+        gender = st.selectbox("Genre", options=["", "Male", "Female", "Other"])
         ki = st.number_input("Ki", min_value=0.0, step=1.0)
         max_ki = st.number_input("Ki maximum", min_value=0.0, step=1.0)
         description = st.text_area("Description", height=100)
@@ -60,8 +82,9 @@ def render_page():
                 data = {
                     "name": name,
                     "race": race,
-                    "ki": ki,
-                    "max_ki": max_ki,
+                    "gender": gender or None,
+                    "ki": float(ki),
+                    "max_ki": float(max_ki),
                     "description": description,
                     "image": image,
                 }
@@ -76,6 +99,7 @@ def render_page():
         if not chars:
             st.info("Aucun personnage à modifier.")
         else:
+            chars = _normalize_numeric_fields(chars)
             ids = [c["_id"] + " - " + str(c.get("name", "")) for c in chars]
             selected = st.selectbox(
                 "Choisis un personnage à modifier", options=[""] + ids
@@ -86,8 +110,24 @@ def render_page():
                 doc = get_character_by_id(selected_id)
 
                 if doc:
+                    # Normaliser pour les champs numériques
+                    doc = {
+                        **doc,
+                        "ki": float(doc.get("ki", 0) or 0),
+                        "max_ki": float(doc.get("max_ki", 0) or 0),
+                    }
+
                     name = st.text_input("Nom", value=doc.get("name", ""))
-                    race = st.text_input("Race", value=doc.get("race", ""))
+                    race = st.text_input(
+                        "Affiliation / Race", value=doc.get("race", "")
+                    )
+                    gender = st.selectbox(
+                        "Genre",
+                        options=["", "Male", "Female", "Other"],
+                        index=["", "Male", "Female", "Other"].index(
+                            doc.get("gender", "") if doc.get("gender", "") in ["Male", "Female", "Other"] else ""
+                        ),
+                    )
                     ki = st.number_input(
                         "Ki",
                         min_value=0.0,
@@ -114,8 +154,9 @@ def render_page():
                         updates = {
                             "name": name,
                             "race": race,
-                            "ki": ki,
-                            "max_ki": max_ki,
+                            "gender": gender or None,
+                            "ki": float(ki),
+                            "max_ki": float(max_ki),
                             "description": description,
                             "image": image,
                         }

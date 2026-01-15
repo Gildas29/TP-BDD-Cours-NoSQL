@@ -17,7 +17,6 @@ client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
 collection = db[COLLECTION_NAME]
 
-
 def fetch_characters():
     """Récupère les personnages depuis l'API Dragon Ball."""
     resp = requests.get(API_URL, timeout=10)
@@ -44,10 +43,11 @@ def clean_character(raw: dict) -> dict:
 
     # Champs typiques de l'API Dragon Ball (à adapter si nécessaire). [web:169]
     name = str(raw.get("name", "")).strip()
-    race = str(raw.get("race", "")).strip()
+    race = str(raw.get("affiliation", raw.get("race", ""))).strip()
     ki = raw.get("ki", 0)
     max_ki = raw.get("maxKi", 0)
     description = str(raw.get("description", "")).strip()
+    gender = str(raw.get("gender", "")).strip()
     image = raw.get("image", "")
 
     # Normalisation des types numériques
@@ -64,6 +64,7 @@ def clean_character(raw: dict) -> dict:
     cleaned = {
         "name": name,
         "race": race,
+        "gender": gender,
         "ki": ki,
         "max_ki": max_ki,
         "description": description,
