@@ -2,7 +2,7 @@ from pymongo import MongoClient
 from dotenv import load_dotenv
 import os
 
-def get_users():
+def update_user():
     # Charger les variables d'environnement
     load_dotenv()
 
@@ -20,23 +20,12 @@ def get_users():
     users_collection = db[col_users]
 
     # Ajoute un user dans la collection 'users'
-    db.users.insert_one(
-        {
-            "name": "Gildas",
-            "email": "gildas@gmail.com",
-            "password": "test"
-        }
+    db.users.update_one(
+        { "name": "Gildas" },
+        {'$set' :
+         {'password': 'test2'}
+        } 
     )
 
-    # Récupérer tous les documents
-    users_cursor = users_collection.find({})  # équivalent SELECT * [web:100][web:101]
-
-    # Convertir en liste (attention si beaucoup de données)
-    users = list(users_cursor)
-
-    print(f"Nombre total d'utilisateurs : {len(users)}")
-
-    return users
-
 if __name__ == "__main__":
-    get_users()
+    update_user()
