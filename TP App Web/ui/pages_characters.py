@@ -22,6 +22,31 @@ def _normalize_numeric_fields(chars):
 
 
 def render_page():
+    # ---- Fond type Dragon Ball + texte sombre ----
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background: radial-gradient(circle at top, #ffe082 0%, #ffb300 35%, #f57c00 70%, #e65100 100%);
+            color: #111111;  /* texte global plus sombre */
+        }
+        /* Titre, sous-titres, labels : texte foncé pour la lisibilité */
+        .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
+        .stApp label, .stApp .stMarkdown, .stApp .stText, .stApp .stCaption {
+            color: #111111 !important;
+        }
+        /* Cartes (colonnes) légèrement translucides pour faire ressortir le texte */
+        .stApp .stColumn > div {
+            padding: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.75);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.title("🟠 Personnages Dragon Ball")
 
     tab_list, tab_add = st.tabs(
@@ -46,18 +71,15 @@ def render_page():
 
                     st.markdown(f"### {c.get('name', 'Sans nom')}")
                     if c.get("image"):
-                        # largeur fixe pour homogénéiser la taille des images
-                        st.image(c["image"], width=200)  # [web:236][web:258]
+                        st.image(c["image"], width=200)
                     st.write(f"**Genre :** {c.get('gender', 'N/A')}")
                     st.write(f"**Ki :** {c.get('ki', 'N/A')}")
                     desc = c.get("description", "")
                     if desc:
                         st.caption(desc[:180] + ("..." if len(desc) > 180 else ""))
 
-                    # Boutons Modifier / Supprimer
                     col_mod, col_del = st.columns(2)
 
-                    # --- Bouton Modifier (ouvre un formulaire sous la carte) ---
                     with col_mod:
                         if doc_id and st.button(
                             "✏️ Modifier", key=f"edit_card_{doc_id}"
@@ -70,9 +92,8 @@ def render_page():
                         ):
                             delete_character(doc_id)
                             st.success(f"Personnage supprimé : {c.get('name', '')}")
-                            st.rerun()  # nouvelle API de rerun
+                            st.rerun()
 
-                    # Formulaire de modification si cette carte est sélectionnée
                     if (
                         doc_id
                         and st.session_state.get("edit_id", None) == doc_id
@@ -155,7 +176,7 @@ def render_page():
                                 update_character(doc_id, updates)
                                 st.success("Personnage mis à jour.")
                                 st.session_state["edit_id"] = None
-                                st.rerun()  # nouvelle API de rerun
+                                st.rerun()
 
     # --- Onglet 2 : Ajout ---
     with tab_add:
