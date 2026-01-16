@@ -1,6 +1,5 @@
 # ui/pages_characters.py
 import streamlit as st
-import pandas as pd
 from db.mongo import (
     get_all_characters,
     get_character_by_id,
@@ -25,62 +24,138 @@ def _normalize_numeric_fields(chars):
 def render_page():
     st.title("🟠 Personnages Dragon Ball")
 
-    tab_list, tab_add, tab_edit = st.tabs(
-        ["📋 Liste / cartes", "➕ Ajouter", "✏️ Modifier"]
+    tab_list, tab_add = st.tabs(
+        ["🃏 Cartes des personnages", "➕ Ajouter un personnage"]
     )
 
-    # --- Onglet 1 : Liste + cartes graphiques ---
+    # --- Onglet 1 : seulement les cartes (modifier + supprimer) ---
     with tab_list:
-        st.subheader("Liste des personnages")
+        st.subheader("Cartes des personnages")
         chars = get_all_characters()
 
         if not chars:
             st.info("Aucun personnage trouvé dans la collection.")
         else:
-            # Normaliser les champs numériques.
             chars = _normalize_numeric_fields(chars)
-
-            # ---- Tableau limité à name / description / gender / ki ----
-            table_rows = []
-            for c in chars:
-                table_rows.append(
-                    {
-                        "name": c.get("name", ""),
-                        "description": c.get("description", ""),
-                        "gender": c.get("gender", ""),
-                        "ki": c.get("ki", 0.0),
-                    }
-                )
-
-            df = pd.DataFrame(table_rows)
-            st.dataframe(df, use_container_width=True)
-
-            # ---- Cartes graphiques avec bouton Supprimer ----
-            st.markdown("### Cartes des personnages")
 
             cols = st.columns(3)
             for idx, c in enumerate(chars):
                 col = cols[idx % 3]
                 with col:
-                    doc_id = c.get("_id")  # str (converti dans get_all_characters)
+                    doc_id = c.get("_id")
 
-                    st.markdown(f"#### {c.get('name', 'Sans nom')}")
-                    # Chemin local relatif (ex: images/goku.png) ou URL complète. [web:236]
+                    st.markdown(f"### {c.get('name', 'Sans nom')}")
                     if c.get("image"):
-                        st.image(c["image"], use_container_width=True)
+                        # largeur fixe pour homogénéiser la taille des images
+                        st.image(c["image"], width=200)  # [web:236][web:258]
                     st.write(f"**Genre :** {c.get('gender', 'N/A')}")
                     st.write(f"**Ki :** {c.get('ki', 'N/A')}")
                     desc = c.get("description", "")
                     if desc:
                         st.caption(desc[:180] + ("..." if len(desc) > 180 else ""))
 
-                    # Bouton supprimer spécifique à cette carte
-                    if doc_id and st.button(
-                        "🗑️ Supprimer", key=f"delete_card_{doc_id}"
+                    # Boutons Modifier / Supprimer
+                    col_mod, col_del = st.columns(2)
+
+                    # --- Bouton Modifier (ouvre un formulaire sous la carte) ---
+                    with col_mod:
+                        if doc_id and st.button(
+                            "✏️ Modifier", key=f"edit_card_{doc_id}"
+                        ):
+                            st.session_state["edit_id"] = doc_id
+
+                    with col_del:
+                        if doc_id and st.button(
+                            "🗑️ Supprimer", key=f"delete_card_{doc_id}"
+                        ):
+                            delete_character(doc_id)
+                            st.success(f"Personnage supprimé : {c.get('name', '')}")
+                            st.rerun()  # nouvelle API de rerun
+
+                    # Formulaire de modification si cette carte est sélectionnée
+                    if (
+                        doc_id
+                        and st.session_state.get("edit_id", None) == doc_id
                     ):
-                        delete_character(doc_id)
-                        st.success(f"Personnage supprimé : {c.get('name', '')}")
-                        st.experimental_rerun()
+                        st.markdown("#### Modifier ce personnage")
+                        doc = get_character_by_id(doc_id)
+                        if doc:
+                            doc = {
+                                **doc,
+                                "ki": float(doc.get("ki", 0) or 0),
+                                "max_ki": float(doc.get("max_ki", 0) or 0),
+                            }
+
+                            name = st.text_input(
+                                "Nom", value=doc.get("name", ""), key=f"name_{doc_id}"
+                            )
+                            race = st.text_input(
+                                "Affiliation / Race",
+                                value=doc.get("race", ""),
+                                key=f"race_{doc_id}",
+                            )
+                            gender_options = ["", "Male", "Female", "Other"]
+                            current_gender = (
+                                doc.get("gender", "")
+                                if doc.get("gender", "") in gender_options
+                                else ""
+                            )
+                            gender_index = gender_options.index(current_gender)
+
+                            gender = st.selectbox(
+                                "Genre",
+                                options=gender_options,
+                                index=gender_index,
+                                key=f"gender_{doc_id}",
+                            )
+                            ki = st.number_input(
+                                "Ki",
+                                min_value=0.0,
+                                step=1.0,
+                                value=float(doc.get("ki", 0)),
+                                key=f"ki_{doc_id}",
+                            )
+                            max_ki = st.number_input(
+                                "Ki maximum",
+                                min_value=0.0,
+                                step=1.0,
+                                value=float(doc.get("max_ki", 0)),
+                                key=f"maxki_{doc_id}",
+                            )
+                            description = st.text_area(
+                                "Description",
+                                value=doc.get("description", ""),
+                                height=100,
+                                key=f"desc_{doc_id}",
+                            )
+
+                            st.markdown(
+                                "Chemin de l'image (exemple local : `images/goku.png`, "
+                                "ou URL complète : `https://...`)"
+                            )
+                            image_path = st.text_input(
+                                "Chemin / URL de l'image",
+                                value=doc.get("image", ""),
+                                key=f"img_{doc_id}",
+                            )
+
+                            if st.button(
+                                "💾 Enregistrer",
+                                key=f"save_{doc_id}",
+                            ):
+                                updates = {
+                                    "name": name,
+                                    "race": race,
+                                    "gender": gender or None,
+                                    "ki": float(ki),
+                                    "max_ki": float(max_ki),
+                                    "description": description,
+                                    "image": image_path,
+                                }
+                                update_character(doc_id, updates)
+                                st.success("Personnage mis à jour.")
+                                st.session_state["edit_id"] = None
+                                st.rerun()  # nouvelle API de rerun
 
     # --- Onglet 2 : Ajout ---
     with tab_add:
@@ -114,104 +189,3 @@ def render_page():
                 }
                 new_id = insert_character(data)
                 st.success(f"Personnage créé avec l'id : {new_id}")
-
-    # --- Onglet 3 : Modification ---
-    with tab_edit:
-        st.subheader("Modifier un personnage existant")
-
-        chars = get_all_characters()
-        if not chars:
-            st.info("Aucun personnage à modifier.")
-        else:
-            chars = _normalize_numeric_fields(chars)
-
-            # On construit :
-            # - display_names : ce que l'utilisateur voit (nom, éventuellement suffixe)
-            # - id_by_label : mapping label -> _id
-            display_names = []
-            id_by_label = {}
-
-            for c in chars:
-                base_name = str(c.get("name", "Sans nom"))
-                label = base_name
-
-                # Si plusieurs persos ont le même nom, ajoute un suffixe avec un bout de l'id
-                if base_name in id_by_label:
-                    label = f"{base_name} ({c['_id'][:6]})"
-
-                display_names.append(label)
-                id_by_label[label] = c["_id"]
-
-            selected_label = st.selectbox(
-                "Choisis un personnage à modifier", options=[""] + display_names
-            )
-
-            if selected_label:
-                selected_id = id_by_label[selected_label]
-                doc = get_character_by_id(selected_id)
-
-                if doc:
-                    doc = {
-                        **doc,
-                        "ki": float(doc.get("ki", 0) or 0),
-                        "max_ki": float(doc.get("max_ki", 0) or 0),
-                    }
-
-                    name = st.text_input("Nom", value=doc.get("name", ""))
-                    race = st.text_input(
-                        "Affiliation / Race", value=doc.get("race", "")
-                    )
-                    gender_options = ["", "Male", "Female", "Other"]
-                    current_gender = (
-                        doc.get("gender", "")
-                        if doc.get("gender", "") in gender_options
-                        else ""
-                    )
-                    gender_index = gender_options.index(current_gender)
-
-                    gender = st.selectbox(
-                        "Genre",
-                        options=gender_options,
-                        index=gender_index,
-                    )
-                    ki = st.number_input(
-                        "Ki",
-                        min_value=0.0,
-                        step=1.0,
-                        value=float(doc.get("ki", 0)),
-                    )
-                    max_ki = st.number_input(
-                        "Ki maximum",
-                        min_value=0.0,
-                        step=1.0,
-                        value=float(doc.get("max_ki", 0)),
-                    )
-                    description = st.text_area(
-                        "Description",
-                        value=doc.get("description", ""),
-                        height=100,
-                    )
-
-                    st.markdown(
-                        "Chemin de l'image (exemple local : `images/goku.png`, "
-                        "ou URL complète : `https://...`)"
-                    )
-                    image_path = st.text_input(
-                        "Chemin / URL de l'image",
-                        value=doc.get("image", ""),
-                    )
-
-                    if st.button("💾 Enregistrer les modifications"):
-                        updates = {
-                            "name": name,
-                            "race": race,
-                            "gender": gender or None,
-                            "ki": float(ki),
-                            "max_ki": float(max_ki),
-                            "description": description,
-                            "image": image_path,
-                        }
-                        update_character(selected_id, updates)
-                        st.success(
-                            "Personnage mis à jour. Rafraîchis la page pour voir les changements."
-                        )
