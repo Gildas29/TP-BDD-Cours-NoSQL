@@ -10,7 +10,6 @@ from db.mongo import (
 
 
 def _normalize_numeric_fields(chars):
-    """Assure que ki / max_ki sont bien des float pour éviter les erreurs de conversion."""
     for c in chars:
         for field in ("ki", "max_ki"):
             val = c.get(field, 0)
